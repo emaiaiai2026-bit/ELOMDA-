@@ -119,6 +119,8 @@
 
   .field{margin-bottom:14px;}
   .field label{display:block; font-size:12.5px; color:var(--ink-soft); margin-bottom:5px; font-weight:600;}
+  .field textarea{width:100%; border:1px solid var(--rule-strong); border-radius:9px; padding:10px;
+    font-family:monospace; font-size:11px; background:var(--card); color:var(--ink); resize:vertical;}
   .field input, .field select{width:100%; border:1px solid var(--rule-strong); border-radius:9px;
     padding:11px 12px; font-family:inherit; font-size:14.5px; background:var(--card); color:var(--ink); outline:none;}
   .field input:focus, .field select:focus{border-color:var(--brass);}
@@ -175,6 +177,12 @@
         <p>متابعة بيع الموبايلات بالتقسيط</p>
       </div>
       <div style="display:flex; gap:8px;">
+        <button class="icon-btn" id="exportBtn" title="نسخ احتياطي (تصدير)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 15V3M7 10l5 5 5-5"/><path d="M4 17v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+        </button>
+        <button class="icon-btn" id="importBtn" title="استيراد نسخة احتياطية">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v12M7 10l5-5 5 5"/><path d="M4 17v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+        </button>
         <button class="icon-btn" id="syncBtn" title="مزامنة مع السحابة">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 16h5v5"/><path d="M4 4v5h5"/><path d="M4.6 9a9 9 0 0 1 14.8-3.4L20 9"/><path d="M4 15l.6 3.4A9 9 0 0 0 19.4 15"/></svg>
         </button>
@@ -257,6 +265,19 @@
         <h2 id="d_title">—</h2>
       </div>
       <div class="sheet-body" id="detailBody"></div>
+    </div>
+  </div>
+
+  <!-- Export/Import sheet -->
+  <div class="sheet-overlay" id="xferOverlay">
+    <div class="sheet">
+      <div class="sheet-head">
+        <button class="icon-btn" id="closeXfer" style="background:transparent;border:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <h2 id="xferTitle">نسخة احتياطية</h2>
+      </div>
+      <div class="sheet-body" id="xferBody"></div>
     </div>
   </div>
 
@@ -563,6 +584,64 @@
 
   document.getElementById('searchInput').addEventListener('input', render);
   document.getElementById('refreshBtn').addEventListener('click', load);
+
+  /* ================= EXPORT / IMPORT (transfer data between pages) ================= */
+  var xferOverlay = document.getElementById('xferOverlay');
+  document.getElementById('closeXfer').addEventListener('click', function(){ xferOverlay.classList.remove('show'); });
+  xferOverlay.addEventListener('click', function(e){ if(e.target===xferOverlay) xferOverlay.classList.remove('show'); });
+
+  document.getElementById('exportBtn').addEventListener('click', function(){
+    document.getElementById('xferTitle').textContent = 'نسخ احتياطي (تصدير)';
+    var raw = localStorage.getItem(STORAGE_KEY) || '[]';
+    document.getElementById('xferBody').innerHTML =
+      '<p style="font-size:13px; color:var(--ink-soft); margin:0 0 12px;">دوس "تحديد الكل ونسخ" وبعدين الصقه في خانة الاستيراد في الصفحة التانية.</p>'+
+      '<div class="field"><textarea id="xferText" rows="10" readonly></textarea></div>'+
+      '<button class="btn-primary" id="xferCopyBtn">تحديد الكل ونسخ</button>'+
+      '<div id="xferMsg" style="font-size:12.5px; color:var(--ink-soft); margin-top:10px; text-align:center;"></div>';
+    document.getElementById('xferText').value = raw;
+    document.getElementById('xferCopyBtn').addEventListener('click', async function(){
+      var ta = document.getElementById('xferText');
+      ta.focus(); ta.select();
+      try{
+        await navigator.clipboard.writeText(ta.value);
+        document.getElementById('xferMsg').textContent = 'تم النسخ، روح الصفحة التانية والصق في الاستيراد.';
+      }catch(e){
+        document.getElementById('xferMsg').textContent = 'النص متحدد دلوقتي — اضغط مطولًا عليه واختر "نسخ" من القائمة اللي هتظهر.';
+      }
+    });
+    xferOverlay.classList.add('show');
+  });
+
+  document.getElementById('importBtn').addEventListener('click', function(){
+    document.getElementById('xferTitle').textContent = 'استيراد نسخة احتياطية';
+    document.getElementById('xferBody').innerHTML =
+      '<p style="font-size:13px; color:var(--ink-soft); margin:0 0 12px;">الصق هنا النص اللي نسخته من زرار "نسخ احتياطي" في الصفحة التانية.</p>'+
+      '<div class="field"><textarea id="xferImportText" rows="10" placeholder="الصق النص هنا"></textarea></div>'+
+      '<div class="auth-err" id="xferErr" style="background:var(--red-bg); color:var(--red); font-size:13px; padding:9px 12px; border-radius:8px; margin-bottom:12px; display:none;"></div>'+
+      '<button class="btn-primary" id="xferImportBtn">استيراد ودمج مع بياناتي الحالية</button>';
+    document.getElementById('xferImportBtn').addEventListener('click', async function(){
+      var txt = document.getElementById('xferImportText').value.trim();
+      var errBox = document.getElementById('xferErr');
+      errBox.classList.remove('show'); errBox.style.display = 'none';
+      var incoming;
+      try{ incoming = JSON.parse(txt); if(!Array.isArray(incoming)) throw new Error('bad'); }
+      catch(e){
+        errBox.textContent = 'النص ده مش نسخة احتياطية صحيحة، تأكد إنك نسخته كامل من غير نقص.';
+        errBox.classList.add('show'); errBox.style.display = 'block';
+        return;
+      }
+      // merge by id, incoming wins on conflict, keep any local-only customers too
+      var byId = {};
+      customers.forEach(function(c){ byId[c.id] = c; });
+      incoming.forEach(function(c){ byId[c.id] = c; });
+      customers = Object.keys(byId).map(function(k){ return byId[k]; });
+      await persist();
+      render();
+      xferOverlay.classList.remove('show');
+      toast('تم استيراد '+incoming.length+' عميل بنجاح');
+    });
+    xferOverlay.classList.add('show');
+  });
 
   /* ================= CLOUD SYNC (backup/push to Supabase) ================= */
   var SUPABASE_URL = "https://zufqnxsldcitkglagwqz.supabase.co";
