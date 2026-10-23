@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
 <title>دفتر الأقساط</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#1C2B38">
 <style>
   :root{
     --paper:#FAF6EE;
@@ -170,6 +174,28 @@
 <body>
 <div id="app">
 
+  <!-- Lock screen: shown by default, hidden only after correct password -->
+  <div id="lockOverlay" style="position:fixed; inset:0; z-index:200; background:var(--navy); display:flex;
+    flex-direction:column; align-items:center; justify-content:center; padding:28px;">
+    <div class="display" style="color:#fff; font-size:26px; margin-bottom:6px;">دفتر الأقساط</div>
+    <p id="lockSubtitle" style="color:#B9C3CB; font-size:13px; margin:0 0 24px;"></p>
+    <div style="width:100%; max-width:320px;">
+      <div class="field" style="margin-bottom:10px;">
+        <input id="lockPass1" type="password" placeholder="كلمة السر" inputmode="numeric"
+          style="width:100%; border:1px solid var(--rule-strong); border-radius:9px; padding:12px; font-family:inherit; font-size:15px; text-align:center;">
+      </div>
+      <div class="field" id="lockPass2Wrap" style="margin-bottom:10px; display:none;">
+        <input id="lockPass2" type="password" placeholder="تأكيد كلمة السر" inputmode="numeric"
+          style="width:100%; border:1px solid var(--rule-strong); border-radius:9px; padding:12px; font-family:inherit; font-size:15px; text-align:center;">
+      </div>
+      <div id="lockErr" style="background:var(--red-bg); color:var(--red); font-size:13px; padding:9px 12px;
+        border-radius:8px; margin-bottom:10px; display:none; text-align:center;"></div>
+      <button id="lockSubmitBtn" class="btn-primary">دخول</button>
+      <button id="lockForgotBtn" style="background:none; border:none; color:#9FACB6; font-size:12.5px;
+        text-decoration:underline; width:100%; margin-top:14px; font-family:inherit;">نسيت كلمة السر؟</button>
+    </div>
+  </div>
+
   <div class="topbar">
     <div class="topbar-row">
       <div>
@@ -311,6 +337,75 @@
 (function(){
   "use strict";
 
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('sw.js').catch(function(){});
+    });
+  }
+
+  /* ================= APP LOCK (local passcode) ================= */
+  var LOCK_KEY = 'installment_app_lock_hash';
+  function simpleHash(str){
+    var h = 5381;
+    for(var i=0;i<str.length;i++){ h = ((h*33) ^ str.charCodeAt(i)) >>> 0; }
+    return h.toString(16);
+  }
+  (function initLock(){
+    var overlay = document.getElementById('lockOverlay');
+    var subtitle = document.getElementById('lockSubtitle');
+    var pass1 = document.getElementById('lockPass1');
+    var pass2Wrap = document.getElementById('lockPass2Wrap');
+    var pass2 = document.getElementById('lockPass2');
+    var errBox = document.getElementById('lockErr');
+    var submitBtn = document.getElementById('lockSubmitBtn');
+    var forgotBtn = document.getElementById('lockForgotBtn');
+
+    var existingHash = localStorage.getItem(LOCK_KEY);
+    var isSetupMode = !existingHash;
+
+    if(isSetupMode){
+      subtitle.textContent = 'حدّد كلمة سر لفتح البرنامج';
+      pass2Wrap.style.display = 'block';
+      forgotBtn.style.display = 'none';
+    } else {
+      subtitle.textContent = 'اكتب كلمة السر عشان تفتح البرنامج';
+      pass2Wrap.style.display = 'none';
+      forgotBtn.style.display = 'block';
+    }
+
+    function showErr(msg){
+      errBox.textContent = msg;
+      errBox.style.display = 'block';
+    }
+    function hideErr(){ errBox.style.display = 'none'; }
+
+    function submit(){
+      hideErr();
+      var p1 = pass1.value;
+      if(isSetupMode){
+        var p2 = pass2.value;
+        if(p1.length < 4){ showErr('كلمة السر لازم تكون 4 أرقام/حروف على الأقل'); return; }
+        if(p1 !== p2){ showErr('كلمة السر غير متطابقة'); return; }
+        localStorage.setItem(LOCK_KEY, simpleHash(p1));
+        overlay.style.display = 'none';
+      } else {
+        if(simpleHash(p1) !== existingHash){ showErr('كلمة السر غلط'); pass1.value=''; pass1.focus(); return; }
+        overlay.style.display = 'none';
+      }
+    }
+
+    submitBtn.addEventListener('click', submit);
+    pass1.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ if(isSetupMode){ pass2.focus(); } else { submit(); } } });
+    pass2.addEventListener('keydown', function(e){ if(e.key === 'Enter') submit(); });
+
+    forgotBtn.addEventListener('click', function(){
+      if(confirm('هيتم إلغاء كلمة السر الحالية (بياناتك مش هتتمسح). تحب تكمل؟')){
+        localStorage.removeItem(LOCK_KEY);
+        location.reload();
+      }
+    });
+  })();
+
   var customers = [];
   var activeId = null;
   var loaded = false;
@@ -332,6 +427,19 @@
     return addMonths(iso, n);
   }
   function freqLabel(freq){ return freq === 'weekly' ? 'أسبوعي' : 'شهري'; }
+
+  function waPhoneDigits(phone){
+    var d = (phone||'').replace(/[^0-9]/g,'');
+    if(!d) return '';
+    if(d.charAt(0) === '0') return '20' + d.slice(1); // Egyptian local -> international
+    if(d.indexOf('20') === 0) return d;
+    return '20' + d;
+  }
+  function waLink(phone, text){
+    var digits = waPhoneDigits(phone);
+    if(!digits) return null;
+    return 'https://wa.me/' + digits + (text ? ('?text=' + encodeURIComponent(text)) : '');
+  }
   function arDate(iso){
     if(!iso) return '—';
     var months=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
@@ -509,6 +617,7 @@
     addOverlay.classList.remove('show');
     toast('تم حفظ العميل');
     await persist();
+    maybeAutoSync();
   });
 
   /* ---------- Detail ---------- */
@@ -554,6 +663,7 @@
         '<div class="d-item full"><span style="margin:0">الحالة — '+(d.completed ? 'مكتمل' : 'القسط القادم: '+arDate(d.nextDue))+'</span>'+
           '<span class="status-pill '+d.status+'">'+statusLabel(d.status)+'</span></div>'+
       '</div>'+
+      (c.phone ? '<button class="btn-primary" id="waBtn" style="background:var(--green); margin-bottom:10px;">تواصل عبر واتساب</button>' : '')+
       (d.completed ? '' : '<button class="btn-primary" id="payBtn">تسجيل دفع قسط ('+fmt(d.monthly)+' ج)</button>')+
       '<div class="section-label" style="margin-top:18px">سجل الأقساط</div>'+
       '<div class="ledger">'+
@@ -562,14 +672,50 @@
       '</div>'+
       '<button class="btn-danger" id="deleteBtn">حذف العميل</button>';
 
+    var waBtn = document.getElementById('waBtn');
+    if(waBtn){
+      waBtn.addEventListener('click', function(){
+        var msg;
+        var lastPayment = c.payments.length ? c.payments[c.payments.length - 1] : null;
+        if(lastPayment){
+          msg = 'أهلاً ' + c.name + '، نفيدك بإيصال استلام دفعة:' +
+                '\n- تاريخ السداد: ' + arDate(lastPayment.date) +
+                '\n- المبلغ المدفوع: ' + fmt(lastPayment.amount) + ' جنيه' +
+                '\n- الباقي عليك: ' + (d.completed ? '0 جنيه (تم السداد بالكامل)' : fmt(d.remaining) + ' جنيه') +
+                (d.completed ? '' : ('\n- القسط القادم: ' + arDate(d.nextDue))) +
+                '\nشكرًا لحضرتك.';
+        } else if(!d.completed){
+          msg = 'أهلاً ' + c.name + '، تذكير بقسط ' + (c.model||'الموبايل') + ' القادم بقيمة ' + fmt(d.monthly) + ' جنيه، المفروض يستحق بتاريخ ' + arDate(d.nextDue) + '.';
+        } else {
+          msg = 'أهلاً ' + c.name + '، بخصوص ' + (c.model||'الموبايل') + '، تم سداد كل الأقساط بالكامل، شكرًا لحضرتك.';
+        }
+        var link = waLink(c.phone, msg);
+        if(link) window.open(link, '_blank');
+      });
+    }
+
     var payBtn = document.getElementById('payBtn');
     if(payBtn){
       payBtn.addEventListener('click', async function(){
-        c.payments.push({id: uid(), date: todayISO(), amount: d.monthly});
+        var paidAmount = d.monthly;
+        c.payments.push({id: uid(), date: todayISO(), amount: paidAmount});
+        var dAfter = derive(c);
         render();
         renderDetail();
         toast('تم تسجيل القسط');
         await persist();
+        maybeAutoSync();
+
+        if(c.phone && confirm('تبعت إيصال الدفعة دي للعميل على واتساب دلوقتي؟')){
+          var msg = 'أهلاً ' + c.name + '، نفيدك بإيصال استلام دفعة:' +
+                '\n- تاريخ السداد: ' + arDate(todayISO()) +
+                '\n- المبلغ المدفوع: ' + fmt(paidAmount) + ' جنيه' +
+                '\n- الباقي عليك: ' + (dAfter.completed ? '0 جنيه (تم السداد بالكامل)' : fmt(dAfter.remaining) + ' جنيه') +
+                (dAfter.completed ? '' : ('\n- القسط القادم: ' + arDate(dAfter.nextDue))) +
+                '\nشكرًا لحضرتك.';
+          var link = waLink(c.phone, msg);
+          if(link) window.open(link, '_blank');
+        }
       });
     }
     document.getElementById('deleteBtn').addEventListener('click', async function(){
@@ -689,6 +835,102 @@
     });
   }
 
+  /* Core bidirectional sync: pulls anything from the cloud not present locally,
+     then pushes anything local that isn't on the cloud yet. Works for both
+     manual login and silent session-reuse (auto-sync). */
+  async function performSync(opts){
+    opts = opts || {};
+    var onStatus = opts.onStatus || function(){};
+
+    onStatus('جاري تحميل مكتبة الاتصال…');
+    await withTimeout(loadSupabaseLib(), 12000, 'تعذر تحميل مكتبة الاتصال — الشبكة بطيئة جدًا أو محجوبة');
+    if(!sbClient) sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    var userId;
+    if(opts.email && opts.password){
+      onStatus('جاري تسجيل الدخول…');
+      var authRes = await withTimeout(
+        sbClient.auth.signInWithPassword({ email: opts.email, password: opts.password }),
+        15000, 'الاتصال بسيرفر الحساب معلّق — حاول تاني بعد شوية'
+      );
+      if(authRes.error) throw authRes.error;
+      userId = authRes.data.user.id;
+    } else {
+      var sess = await withTimeout(sbClient.auth.getSession(), 8000, 'تعذر التحقق من الجلسة');
+      if(!sess.data.session){ return {skipped:true}; }
+      userId = sess.data.session.user.id;
+    }
+
+    onStatus('جاري جلب بياناتك من السحابة…');
+    var rawNow = localStorage.getItem(STORAGE_KEY);
+    var freshCustomers = rawNow ? JSON.parse(rawNow) : [];
+
+    var pulled = await sbClient.from('customers').select('*, payments(*)');
+    if(pulled.error) throw new Error('تعذر جلب البيانات من السحابة: '+pulled.error.message);
+
+    var localByRemote = {};
+    freshCustomers.forEach(function(c){ if(c.remoteId) localByRemote[c.remoteId] = c; });
+
+    var pulledCustomers = 0, pulledPayments = 0;
+    (pulled.data || []).forEach(function(cr){
+      var local = localByRemote[cr.id];
+      if(!local){
+        local = {
+          id: uid(), remoteId: cr.id, name: cr.name, phone: cr.phone, model: cr.model,
+          price: parseFloat(cr.price), down: parseFloat(cr.down_payment),
+          count: cr.installments_count, freq: cr.freq, firstDue: cr.first_due_date,
+          payments: []
+        };
+        freshCustomers.push(local);
+        localByRemote[cr.id] = local;
+        pulledCustomers++;
+      }
+      var localPayRemoteIds = {};
+      local.payments.forEach(function(p){ if(p.remoteId) localPayRemoteIds[p.remoteId] = true; });
+      (cr.payments || []).forEach(function(cp){
+        if(!localPayRemoteIds[cp.id]){
+          local.payments.push({ id: uid(), remoteId: cp.id, date: cp.paid_date, amount: parseFloat(cp.amount) });
+          pulledPayments++;
+        }
+      });
+    });
+
+    onStatus('جاري رفع أي بيانات جديدة…');
+    var newCustomers = 0, newPayments = 0;
+    for(var i=0; i<freshCustomers.length; i++){
+      var c = freshCustomers[i];
+      if(!c.remoteId){
+        var ins = await sbClient.from('customers').insert({
+          user_id: userId, name: c.name, phone: c.phone, model: c.model,
+          price: c.price, down_payment: c.down, installments_count: c.count,
+          first_due_date: c.firstDue, freq: c.freq || 'monthly'
+        }).select().single();
+        if(ins.error){ throw new Error('تعذر رفع عميل "'+c.name+'": '+ins.error.message); }
+        c.remoteId = ins.data.id;
+        newCustomers++;
+      }
+      for(var j=0; j<c.payments.length; j++){
+        var p = c.payments[j];
+        if(!p.remoteId){
+          var pins = await sbClient.from('payments').insert({
+            customer_id: c.remoteId, amount: p.amount, paid_date: p.date
+          }).select().single();
+          if(pins.error){ throw new Error('تعذر رفع قسط لعميل "'+c.name+'": '+pins.error.message); }
+          p.remoteId = pins.data.id;
+          newPayments++;
+        }
+      }
+    }
+
+    customers = freshCustomers;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
+    render();
+
+    return { newCustomers: newCustomers, newPayments: newPayments,
+      pulledCustomers: pulledCustomers, pulledPayments: pulledPayments,
+      total: freshCustomers.length };
+  }
+
   document.getElementById('syncRunBtn').addEventListener('click', async function(){
     var btn = this;
     var phone = normalizePhone(document.getElementById('sy_phone').value);
@@ -699,73 +941,39 @@
     if(!pass){ syncErr('اكتب كلمة السر'); return; }
 
     btn.disabled = true;
-    syncStatus('جاري تحميل مكتبة الاتصال…');
     try{
-      await withTimeout(loadSupabaseLib(), 12000, 'تعذر تحميل مكتبة الاتصال — الشبكة بطيئة جدًا أو محجوبة');
-      if(!sbClient) sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-      syncStatus('جاري تسجيل الدخول…');
-      var email = phoneToEmail(phone);
-      var authRes = await withTimeout(
-        sbClient.auth.signInWithPassword({ email: email, password: pass }),
-        15000, 'الاتصال بسيرفر الحساب معلّق — جرّب تفتح الملف من Chrome عادي بدل أيقونة الشاشة الرئيسية'
-      );
-      if(authRes.error) throw authRes.error;
-      var userId = authRes.data.user.id;
-      syncStatus('تم تسجيل الدخول، جاري رفع العملاء…');
-
-      // Re-read straight from device storage to avoid any stale in-memory list
-      var rawNow = localStorage.getItem(STORAGE_KEY);
-      var freshCustomers = rawNow ? JSON.parse(rawNow) : [];
-      syncStatus('لقيت '+freshCustomers.length+' عميل محفوظ، جاري الرفع…');
-
-      var newCustomers = 0, newPayments = 0;
-
-      for(var i=0; i<freshCustomers.length; i++){
-        var c = freshCustomers[i];
-        if(!c.remoteId){
-          var ins = await sbClient.from('customers').insert({
-            user_id: userId, name: c.name, phone: c.phone, model: c.model,
-            price: c.price, down_payment: c.down, installments_count: c.count,
-            first_due_date: c.firstDue, freq: c.freq || 'monthly'
-          }).select().single();
-          if(ins.error){ throw new Error('تعذر رفع عميل "'+c.name+'": '+ins.error.message); }
-          c.remoteId = ins.data.id;
-          newCustomers++;
-        }
-        for(var j=0; j<c.payments.length; j++){
-          var p = c.payments[j];
-          if(!p.remoteId){
-            var pins = await sbClient.from('payments').insert({
-              customer_id: c.remoteId, amount: p.amount, paid_date: p.date
-            }).select().single();
-            if(pins.error){ throw new Error('تعذر رفع قسط لعميل "'+c.name+'": '+pins.error.message); }
-            p.remoteId = pins.data.id;
-            newPayments++;
-          }
-        }
-      }
-
-      customers = freshCustomers;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
-      render();
-      syncStatus('تم بنجاح: '+newCustomers+' عميل جديد، '+newPayments+' قسط جديد اترفعوا (من إجمالي '+freshCustomers.length+' عميل محفوظ).');
+      var r = await performSync({ email: phoneToEmail(phone), password: pass, onStatus: syncStatus });
+      var parts = [];
+      if(r.pulledCustomers) parts.push('استرجعنا '+r.pulledCustomers+' عميل من السحابة');
+      if(r.newCustomers || r.newPayments) parts.push(r.newCustomers+' عميل و'+r.newPayments+' قسط اترفعوا');
+      if(!parts.length) parts.push('كل حاجة متزامنة بالفعل');
+      syncStatus('تم بنجاح: '+parts.join('، ')+' (إجمالي '+r.total+' عميل محفوظ).');
       toast('تمت المزامنة بنجاح');
       btn.disabled = false;
-      setTimeout(function(){ syncOverlay.classList.remove('show'); }, 1800);
+      setTimeout(function(){ syncOverlay.classList.remove('show'); }, 2200);
     }catch(e){
       btn.disabled = false;
       syncStatus('');
       var msg = (e && e.message) || 'حصل خطأ غير متوقع';
       if(msg.indexOf('Invalid login') !== -1) msg = 'رقم الموبايل أو كلمة السر غلط';
       syncErr(msg);
-      if(typeof freshCustomers !== 'undefined'){
-        customers = freshCustomers;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
-        render();
-      }
     }
   });
+
+  /* Silent best-effort auto-sync after local changes — only runs if a
+     cloud session is already available (from a prior manual login), and
+     never interrupts the user or shows errors. */
+  async function maybeAutoSync(){
+    try{
+      if(!navigator.onLine) return;
+      await loadSupabaseLib();
+      if(!sbClient) sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      var r = await performSync({ onStatus: function(){} });
+      if(r && !r.skipped && (r.newCustomers || r.newPayments || r.pulledCustomers)){
+        toast('تمت المزامنة التلقائية مع السحابة');
+      }
+    }catch(e){ /* silent: background best-effort only */ }
+  }
 
   load();
 })();

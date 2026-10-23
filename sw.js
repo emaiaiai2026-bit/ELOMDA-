@@ -1,5 +1,5 @@
-var CACHE_NAME = 'installments-ledger-v1';
-var SHELL = ['./local.html', './manifest.json', './icon-192.png', './icon-512.png'];
+var CACHE_NAME = 'installments-ledger-v2';
+var SHELL = ['./local.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-512-maskable.png'];
 
 self.addEventListener('install', function(event){
   self.skipWaiting();
