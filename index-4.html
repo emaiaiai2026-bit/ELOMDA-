@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>دفتر الأقساط</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#1C2B38">
+<style>
+  :root{
+    --paper:#FAF6EE;
+    --paper-dim:#F2ECDF;
+    --ink:#20303D;
+    --ink-soft:#5B6B77;
+    --ink-faint:#93A0A9;
+    --rule:#DCD2BC;
+    --rule-strong:#C9BC9E;
+    --brass:#B2802C;
+    --brass-bg:#F3E6CC;
+    --green:#2E6B52;
+    --green-bg:#E1EEE5;
+    --red:#AF3E30;
+    --red-bg:#F6E3DF;
+    --card:#FFFDF8;
+    --navy:#1C2B38;
+    --navy-ink:#13202B;
+    --radius:10px;
+    --shadow:0 1px 2px rgba(28,43,56,.06), 0 4px 14px rgba(28,43,56,.07);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; background:var(--paper); color:var(--ink);
+    font-family:'Segoe UI', Tahoma, Geneva, Arial, sans-serif; height:100%;
+    overscroll-behavior-y:contain;}
+  body{display:flex; justify-content:center;}
+  #app{width:100%; max-width:480px; min-height:100vh; background:var(--paper);
+    display:flex; flex-direction:column; position:relative; overscroll-behavior-y:contain;}
+
+  .display{font-family:'Segoe UI', Tahoma, Geneva, Arial, sans-serif; font-weight:700; letter-spacing:.3px;}
+
+  /* ---------- Top bar ---------- */
+  .topbar{background:var(--navy); color:#fff; padding:22px 18px 18px;
+    border-bottom:3px solid var(--brass); position:sticky; top:0; z-index:20;}
+  .topbar-row{display:flex; align-items:center; justify-content:space-between;}
+  .topbar h1{margin:0; font-size:26px; letter-spacing:.5px;}
+  .topbar p{margin:4px 0 0; font-size:12.5px; color:#B9C3CB; font-weight:400;}
+  .icon-btn{background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.18);
+    color:#fff; width:40px; height:40px; border-radius:10px; display:flex; align-items:center;
+    justify-content:center; cursor:pointer; flex-shrink:0;}
+  .icon-btn:active{background:rgba(255,255,255,.22);}
+  .icon-btn svg{width:20px; height:20px;}
+
+  /* ---------- Stats strip ---------- */
+  .stats{display:flex; background:var(--navy-ink); color:#fff; margin-top:14px; border-radius:10px;
+    overflow:hidden;}
+  .stat{flex:1; text-align:center; padding:12px 6px; border-left:1px solid rgba(255,255,255,.12);}
+  .stat:last-child{border-left:none;}
+  .stat b{display:block; font-size:19px; font-weight:700; font-variant-numeric:tabular-nums;}
+  .stat b.warn{color:#E3B26A;}
+  .stat b.danger{color:#E58C7D;}
+  .stat span{display:block; font-size:10.5px; color:#9FACB6; margin-top:2px;}
+
+  /* ---------- Search ---------- */
+  .search-wrap{padding:14px 16px 6px;}
+  .search-box{display:flex; align-items:center; gap:8px; background:var(--card);
+    border:1px solid var(--rule); border-radius:10px; padding:9px 12px;}
+  .search-box svg{width:17px; height:17px; color:var(--ink-faint); flex-shrink:0;}
+  .search-box input{border:none; outline:none; background:transparent; font-family:inherit;
+    font-size:14.5px; color:var(--ink); width:100%;}
+  .search-box input::placeholder{color:var(--ink-faint);}
+
+  /* ---------- Customer list ---------- */
+  .list{padding:4px 16px 110px;}
+  .section-label{font-size:11px; color:var(--ink-faint); margin:16px 2px 6px; font-weight:600;
+    letter-spacing:.2px;}
+  .row{display:flex; background:var(--card); border:1px solid var(--rule); border-radius:var(--radius);
+    margin-bottom:9px; overflow:hidden; cursor:pointer;}
+  .row:active{background:var(--paper-dim);}
+  .row-bar{width:5px; flex-shrink:0;}
+  .row-bar.ok{background:var(--green);}
+  .row-bar.due{background:var(--brass);}
+  .row-bar.late{background:var(--red);}
+  .row-body{flex:1; padding:11px 13px; min-width:0;}
+  .row-top{display:flex; justify-content:space-between; align-items:baseline; gap:8px;}
+  .row-name{font-size:15px; font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden;
+    text-overflow:ellipsis;}
+  .row-amount{font-size:15px; font-weight:700; font-variant-numeric:tabular-nums; flex-shrink:0;}
+  .row-amount.ok{color:var(--green);}
+  .row-amount.due{color:var(--brass);}
+  .row-amount.late{color:var(--red);}
+  .row-sub{display:flex; justify-content:space-between; align-items:center; margin-top:4px;}
+  .row-model{font-size:12px; color:var(--ink-soft);}
+  .row-badge{font-size:10.5px; padding:2px 8px; border-radius:20px; font-weight:600;}
+  .row-badge.ok{background:var(--green-bg); color:var(--green);}
+  .row-badge.due{background:var(--brass-bg); color:var(--brass);}
+  .row-badge.late{background:var(--red-bg); color:var(--red);}
+
+  .empty{text-align:center; padding:60px 20px; color:var(--ink-faint);}
+  .empty svg{width:46px; height:46px; margin-bottom:10px; opacity:.5;}
+  .empty p{font-size:13.5px; margin:0;}
+
+  /* ---------- FAB ---------- */
+  .fab{position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    max-width:448px; width:calc(100% - 32px); z-index:25;}
+  .fab button{width:100%; background:var(--navy); color:#fff; border:none; border-radius:12px;
+    padding:14px; font-family:inherit; font-size:15px; font-weight:600; display:flex; align-items:center;
+    justify-content:center; gap:8px; box-shadow:0 6px 20px rgba(28,43,56,.35); cursor:pointer;}
+  .fab button:active{background:var(--navy-ink);}
+  .fab svg{width:18px; height:18px;}
+
+  /* ---------- Sheet (modal) ---------- */
+  .sheet-overlay{position:fixed; inset:0; background:rgba(20,30,38,.45); z-index:40; display:none;
+    justify-content:center;}
+  .sheet-overlay.show{display:flex;}
+  .sheet{width:100%; max-width:480px; background:var(--paper); margin-top:auto; border-radius:18px 18px 0 0;
+    max-height:92vh; overflow-y:auto; animation:slideUp .22s ease-out; overscroll-behavior-y:contain;}
+  @keyframes slideUp{from{transform:translateY(24px); opacity:.6;} to{transform:translateY(0); opacity:1;}}
+  .sheet-head{position:sticky; top:0; background:var(--navy); color:#fff; padding:16px 16px 14px;
+    display:flex; align-items:center; gap:10px; border-bottom:3px solid var(--brass); z-index:2;}
+  .sheet-head h2{font-size:17px; margin:0; font-weight:700; flex:1;}
+  .sheet-body{padding:18px 16px 28px;}
+
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:12.5px; color:var(--ink-soft); margin-bottom:5px; font-weight:600;}
+  .field textarea{width:100%; border:1px solid var(--rule-strong); border-radius:9px; padding:10px;
+    font-family:monospace; font-size:11px; background:var(--card); color:var(--ink); resize:vertical;}
+  .field input, .field select{width:100%; border:1px solid var(--rule-strong); border-radius:9px;
+    padding:11px 12px; font-family:inherit; font-size:14.5px; background:var(--card); color:var(--ink); outline:none;}
+  .field input:focus, .field select:focus{border-color:var(--brass);}
+  .field-row{display:flex; gap:10px;}
+  .field-row .field{flex:1;}
+  .preview{background:var(--brass-bg); border:1px dashed var(--brass); border-radius:9px; padding:10px 12px;
+    font-size:13px; color:#7A5A1E; margin:4px 0 16px; display:flex; justify-content:space-between;}
+  .preview b{font-variant-numeric:tabular-nums;}
+
+  .btn-primary{width:100%; background:var(--navy); color:#fff; border:none; border-radius:10px;
+    padding:13px; font-family:inherit; font-size:15px; font-weight:600; cursor:pointer;}
+  .btn-primary:active{background:var(--navy-ink);}
+  .btn-danger{width:100%; background:var(--red-bg); color:var(--red); border:1px solid var(--red);
+    border-radius:10px; padding:12px; font-family:inherit; font-size:14px; font-weight:600; cursor:pointer;
+    margin-top:10px;}
+
+  /* ---------- Detail view ---------- */
+  .d-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;}
+  .d-item{background:var(--card); border:1px solid var(--rule); border-radius:9px; padding:10px 12px;}
+  .d-item span{display:block; font-size:11px; color:var(--ink-faint); margin-bottom:3px;}
+  .d-item b{font-size:15.5px; font-variant-numeric:tabular-nums; color:var(--ink);}
+  .d-item.full{grid-column:1/-1; display:flex; justify-content:space-between; align-items:center;}
+  .status-pill{display:inline-block; padding:4px 12px; border-radius:20px; font-size:12.5px; font-weight:700;}
+  .status-pill.ok{background:var(--green-bg); color:var(--green);}
+  .status-pill.due{background:var(--brass-bg); color:var(--brass);}
+  .status-pill.late{background:var(--red-bg); color:var(--red);}
+
+  .ledger{border:1px solid var(--rule); border-radius:9px; overflow:hidden; margin:14px 0;}
+  .ledger-row{display:flex; align-items:center; padding:9px 12px; border-bottom:1px solid var(--rule);
+    font-size:13px;}
+  .ledger-row:last-child{border-bottom:none;}
+  .ledger-row.head{background:var(--paper-dim); font-weight:700; color:var(--ink-soft); font-size:11.5px;}
+  .ledger-row span:first-child{width:28px; color:var(--ink-faint); flex-shrink:0;}
+  .ledger-row span.date{flex:1;}
+  .ledger-row span.amt{width:80px; text-align:left; font-variant-numeric:tabular-nums; font-weight:600;}
+  .ledger-row span.amt.paid{color:var(--green);}
+  .ledger-row span.amt.pending{color:var(--ink-faint);}
+
+  .toast{position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:var(--navy-ink);
+    color:#fff; padding:10px 20px; border-radius:30px; font-size:13px; z-index:60; opacity:0;
+    transition:opacity .25s, transform .25s; pointer-events:none;}
+  .toast.show{opacity:1;}
+
+  .loading{text-align:center; padding:50px; color:var(--ink-faint); font-size:13px;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Lock screen: shown by default, hidden only after correct password -->
+  <div id="lockOverlay" style="position:fixed; inset:0; z-index:200; background:var(--navy); display:flex;
+    flex-direction:column; align-items:center; justify-content:center; padding:28px;">
+    <div class="display" style="color:#fff; font-size:26px; margin-bottom:6px;">دفتر الأقساط</div>
+    <p id="lockSubtitle" style="color:#B9C3CB; font-size:13px; margin:0 0 24px;"></p>
+    <div style="width:100%; max-width:320px;">
+      <div class="field" style="margin-bottom:10px;">
+        <input id="lockPass1" type="password" placeholder="كلمة السر" inputmode="numeric"
+          style="width:100%; border:1px solid var(--rule-strong); border-radius:9px; padding:12px; font-family:inherit; font-size:15px; text-align:center;">
+      </div>
+      <div class="field" id="lockPass2Wrap" style="margin-bottom:10px; display:none;">
+        <input id="lockPass2" type="password" placeholder="تأكيد كلمة السر" inputmode="numeric"
+          style="width:100%; border:1px solid var(--rule-strong); border-radius:9px; padding:12px; font-family:inherit; font-size:15px; text-align:center;">
+      </div>
+      <div id="lockErr" style="background:var(--red-bg); color:var(--red); font-size:13px; padding:9px 12px;
+        border-radius:8px; margin-bottom:10px; display:none; text-align:center;"></div>
+      <button id="lockSubmitBtn" class="btn-primary">دخول</button>
+      <button id="lockForgotBtn" style="background:none; border:none; color:#9FACB6; font-size:12.5px;
+        text-decoration:underline; width:100%; margin-top:14px; font-family:inherit;">نسيت كلمة السر؟</button>
+    </div>
+  </div>
+
+  <div class="topbar">
+    <div class="topbar-row">
+      <div>
+        <h1 class="display">دفتر الأقساط</h1>
+        <p>متابعة بيع الموبايلات بالتقسيط</p>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="icon-btn" id="exportBtn" title="نسخ احتياطي (تصدير)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 15V3M7 10l5 5 5-5"/><path d="M4 17v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+        </button>
+        <button class="icon-btn" id="importBtn" title="استيراد نسخة احتياطية">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v12M7 10l5-5 5 5"/><path d="M4 17v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+        </button>
+        <button class="icon-btn" id="syncBtn" title="مزامنة مع السحابة">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 16h5v5"/><path d="M4 4v5h5"/><path d="M4.6 9a9 9 0 0 1 14.8-3.4L20 9"/><path d="M4 15l.6 3.4A9 9 0 0 0 19.4 15"/></svg>
+        </button>
+        <button class="icon-btn" id="refreshBtn" title="تحديث">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="statCount">0</b><span>عميل</span></div>
+      <div class="stat"><b id="statDue" class="warn">0</b><span>متوقع الشهر</span></div>
+      <div class="stat"><b id="statLate" class="danger">0</b><span>متأخر</span></div>
+    </div>
+  </div>
+
+  <div class="search-wrap">
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="searchInput" type="text" placeholder="ابحث بالاسم أو رقم التليفون">
+    </div>
+  </div>
+
+  <div class="list" id="listWrap">
+    <div class="loading">جاري التحميل…</div>
+  </div>
+
+  <div class="fab">
+    <button id="addBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      إضافة عميل جديد
+    </button>
+  </div>
+
+  <!-- Add customer sheet -->
+  <div class="sheet-overlay" id="addOverlay">
+    <div class="sheet">
+      <div class="sheet-head">
+        <button class="icon-btn" id="closeAdd" style="background:transparent;border:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <h2>إضافة عميل جديد</h2>
+      </div>
+      <div class="sheet-body">
+        <div class="field"><label>اسم العميل</label><input id="f_name" type="text" placeholder="مثال: أحمد محمد علي"></div>
+        <div class="field-row">
+          <div class="field"><label>رقم التليفون</label><input id="f_phone" type="tel" placeholder="01xxxxxxxxx"></div>
+          <div class="field"><label>موديل الموبايل</label><input id="f_model" type="text" placeholder="Samsung A15"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>السعر الكاش</label><input id="f_price" type="number" inputmode="decimal" placeholder="12000"></div>
+          <div class="field"><label>المقدم</label><input id="f_down" type="number" inputmode="decimal" placeholder="3000"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>عدد الأقساط</label><input id="f_count" type="number" inputmode="numeric" placeholder="6"></div>
+          <div class="field"><label>تاريخ أول قسط</label><input id="f_firstdue" type="date"></div>
+        </div>
+        <div class="field">
+          <label>دورية السداد</label>
+          <select id="f_freq">
+            <option value="monthly">شهري</option>
+            <option value="weekly">أسبوعي</option>
+          </select>
+        </div>
+        <div class="preview" id="livePreview">
+          <span>المبلغ الممول: <b id="pv_funded">0</b> ج</span>
+          <span>قيمة كل قسط: <b id="pv_monthly">0</b> ج <span id="pv_freq_label"></span></span>
+        </div>
+        <button class="btn-primary" id="saveBtn">حفظ العميل</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail sheet -->
+  <div class="sheet-overlay" id="detailOverlay">
+    <div class="sheet">
+      <div class="sheet-head">
+        <button class="icon-btn" id="closeDetail" style="background:transparent;border:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <h2 id="d_title">—</h2>
+      </div>
+      <div class="sheet-body" id="detailBody"></div>
+    </div>
+  </div>
+
+  <!-- Export/Import sheet -->
+  <div class="sheet-overlay" id="xferOverlay">
+    <div class="sheet">
+      <div class="sheet-head">
+        <button class="icon-btn" id="closeXfer" style="background:transparent;border:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <h2 id="xferTitle">نسخة احتياطية</h2>
+      </div>
+      <div class="sheet-body" id="xferBody"></div>
+    </div>
+  </div>
+
+  <!-- Sync sheet -->
+  <div class="sheet-overlay" id="syncOverlay">
+    <div class="sheet">
+      <div class="sheet-head">
+        <button class="icon-btn" id="closeSync" style="background:transparent;border:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <h2>مزامنة مع السحابة</h2>
+      </div>
+      <div class="sheet-body" id="syncBody">
+        <p style="font-size:13px; color:var(--ink-soft); margin:0 0 16px;">
+          هيترفع كل عميل وقسط عندك هنا (لسه ما اتزامنش) لحساب السحابة بتاعك.
+          محتاج إنترنت شغال دلوقتي.
+        </p>
+        <div class="field"><label>رقم الموبايل (حساب السحابة)</label><input id="sy_phone" type="tel" placeholder="01xxxxxxxxx" inputmode="numeric"></div>
+        <div class="field"><label>كلمة السر</label><input id="sy_pass" type="password" placeholder="كلمة سر حساب السحابة"></div>
+        <div class="auth-err" id="syncErr" style="background:var(--red-bg); color:var(--red); font-size:13px; padding:9px 12px; border-radius:8px; margin-bottom:12px; display:none;"></div>
+        <button class="btn-primary" id="syncRunBtn">تسجيل الدخول والمزامنة الآن</button>
+        <div id="syncStatus" style="font-size:12.5px; color:var(--ink-soft); margin-top:12px; text-align:center;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('sw.js').catch(function(){});
+    });
+  }
+
+  /* ================= APP LOCK (local passcode) ================= */
+  var LOCK_KEY = 'installment_app_lock_hash';
+  function simpleHash(str){
+    var h = 5381;
+    for(var i=0;i<str.length;i++){ h = ((h*33) ^ str.charCodeAt(i)) >>> 0; }
+    return h.toString(16);
+  }
+  (function initLock(){
+    var overlay = document.getElementById('lockOverlay');
+    var subtitle = document.getElementById('lockSubtitle');
+    var pass1 = document.getElementById('lockPass1');
+    var pass2Wrap = document.getElementById('lockPass2Wrap');
+    var pass2 = document.getElementById('lockPass2');
+    var errBox = document.getElementById('lockErr');
+    var submitBtn = document.getElementById('lockSubmitBtn');
+    var forgotBtn = document.getElementById('lockForgotBtn');
+
+    var existingHash = localStorage.getItem(LOCK_KEY);
+    var isSetupMode = !existingHash;
+
+    if(isSetupMode){
+      subtitle.textContent = 'حدّد كلمة سر لفتح البرنامج';
+      pass2Wrap.style.display = 'block';
+      forgotBtn.style.display = 'none';
+    } else {
+      subtitle.textContent = 'اكتب كلمة السر عشان تفتح البرنامج';
+      pass2Wrap.style.display = 'none';
+      forgotBtn.style.display = 'block';
+    }
+
+    function showErr(msg){
+      errBox.textContent = msg;
+      errBox.style.display = 'block';
+    }
+    function hideErr(){ errBox.style.display = 'none'; }
+
+    function submit(){
+      hideErr();
+      var p1 = pass1.value;
+      if(isSetupMode){
+        var p2 = pass2.value;
+        if(p1.length < 4){ showErr('كلمة السر لازم تكون 4 أرقام/حروف على الأقل'); return; }
+        if(p1 !== p2){ showErr('كلمة السر غير متطابقة'); return; }
+        localStorage.setItem(LOCK_KEY, simpleHash(p1));
+        overlay.style.display = 'none';
+      } else {
+        if(simpleHash(p1) !== existingHash){ showErr('كلمة السر غلط'); pass1.value=''; pass1.focus(); return; }
+        overlay.style.display = 'none';
+      }
+    }
+
+    submitBtn.addEventListener('click', submit);
+    pass1.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ if(isSetupMode){ pass2.focus(); } else { submit(); } } });
+    pass2.addEventListener('keydown', function(e){ if(e.key === 'Enter') submit(); });
+
+    forgotBtn.addEventListener('click', function(){
+      if(confirm('هيتم إلغاء كلمة السر الحالية (بياناتك مش هتتمسح). تحب تكمل؟')){
+        localStorage.removeItem(LOCK_KEY);
+        location.reload();
+      }
+    });
+  })();
+
+  var customers = [];
+  var activeId = null;
+  var loaded = false;
+
+  function uid(){ return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+  function fmt(n){ n = Math.round(n||0); return n.toLocaleString('en-US'); }
+  function todayISO(){ var d=new Date(); return d.toISOString().slice(0,10); }
+  function addMonths(iso, months){
+    var d = new Date(iso + 'T00:00:00');
+    d.setMonth(d.getMonth() + months);
+    return d.toISOString().slice(0,10);
+  }
+  function addPeriod(iso, n, freq){
+    if(freq === 'weekly'){
+      var d = new Date(iso + 'T00:00:00');
+      d.setDate(d.getDate() + n * 7);
+      return d.toISOString().slice(0,10);
+    }
+    return addMonths(iso, n);
+  }
+  function freqLabel(freq){ return freq === 'weekly' ? 'أسبوعي' : 'شهري'; }
+
+  function waPhoneDigits(phone){
+    var d = (phone||'').replace(/[^0-9]/g,'');
+    if(!d) return '';
+    if(d.charAt(0) === '0') return '20' + d.slice(1); // Egyptian local -> international
+    if(d.indexOf('20') === 0) return d;
+    return '20' + d;
+  }
+  function waLink(phone, text){
+    var digits = waPhoneDigits(phone);
+    if(!digits) return null;
+    return 'https://wa.me/' + digits + (text ? ('?text=' + encodeURIComponent(text)) : '');
+  }
+  function arDate(iso){
+    if(!iso) return '—';
+    var months=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+    var d = new Date(iso + 'T00:00:00');
+    return d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+  }
+
+  function derive(c){
+    var funded = c.price - c.down;
+    var monthly = c.count > 0 ? funded / c.count : 0;
+    var paidCount = c.payments.length;
+    var collected = c.payments.reduce(function(s,p){ return s + p.amount; }, 0);
+    var remaining = funded - collected;
+    var completed = paidCount >= c.count;
+    var nextDue = completed ? null : addPeriod(c.firstDue, paidCount, c.freq || 'monthly');
+    var status = completed ? 'ok' : (nextDue && nextDue < todayISO() ? 'late' : 'due');
+    return {funded:funded, monthly:monthly, paidCount:paidCount, collected:collected,
+      remaining:remaining, completed:completed, nextDue:nextDue, status:status};
+  }
+
+  function statusLabel(s){
+    return s==='ok' ? 'مكتمل' : (s==='late' ? 'متأخر' : 'منتظم');
+  }
+
+  function toast(msg){
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 1800);
+  }
+
+  var STORAGE_KEY = 'installment_ledger_customers';
+
+  async function persist(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
+    }catch(e){
+      console.error('storage error', e);
+      toast('تعذر الحفظ على الجهاز، تأكد إن مساحة التخزين مش ممتلئة');
+    }
+  }
+
+  async function load(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      customers = raw ? JSON.parse(raw) : [];
+    }catch(e){
+      customers = [];
+    }
+    loaded = true;
+    render();
+  }
+
+  function computeStats(){
+    var count = customers.length;
+    var dueThisMonth = 0, late = 0;
+    var now = new Date(); var curMonth = now.getMonth(), curYear = now.getFullYear();
+    customers.forEach(function(c){
+      var d = derive(c);
+      if(d.status === 'late') late++;
+      if(!d.completed && d.nextDue){
+        var nd = new Date(d.nextDue + 'T00:00:00');
+        if(nd.getMonth()===curMonth && nd.getFullYear()===curYear) dueThisMonth += d.monthly;
+      }
+    });
+    document.getElementById('statCount').textContent = count;
+    document.getElementById('statDue').textContent = fmt(dueThisMonth);
+    document.getElementById('statLate').textContent = late;
+  }
+
+  function render(){
+    computeStats();
+    var wrap = document.getElementById('listWrap');
+    var q = document.getElementById('searchInput').value.trim();
+    var list = customers.filter(function(c){
+      if(!q) return true;
+      return c.name.indexOf(q) !== -1 || (c.phone||'').indexOf(q) !== -1;
+    });
+    // sort: late first, then due, then ok
+    var order = {late:0, due:1, ok:2};
+    list = list.slice().sort(function(a,b){
+      return order[derive(a).status] - order[derive(b).status];
+    });
+
+    if(!loaded){
+      wrap.innerHTML = '<div class="loading">جاري التحميل…</div>';
+      return;
+    }
+    if(list.length === 0){
+      wrap.innerHTML = '<div class="empty">'+
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>'+
+        '<p>'+ (customers.length===0 ? 'لسه مفيش عملاء — ابدأ بإضافة أول عميل' : 'مفيش نتائج مطابقة للبحث') +'</p>'+
+        '</div>';
+      return;
+    }
+    wrap.innerHTML = list.map(function(c){
+      var d = derive(c);
+      var amountText = d.completed ? 'مكتمل' : fmt(d.remaining) + ' ج';
+      return '<div class="row" data-id="'+c.id+'">'+
+        '<div class="row-bar '+d.status+'"></div>'+
+        '<div class="row-body">'+
+          '<div class="row-top">'+
+            '<div class="row-name">'+escapeHtml(c.name)+'</div>'+
+            '<div class="row-amount '+d.status+'">'+amountText+'</div>'+
+          '</div>'+
+          '<div class="row-sub">'+
+            '<div class="row-model">'+escapeHtml(c.model||'')+' · قسط '+Math.min(d.paidCount+ (d.completed?0:1), c.count)+'/'+c.count+'</div>'+
+            '<div class="row-badge '+d.status+'">'+statusLabel(d.status)+'</div>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+
+    Array.prototype.forEach.call(wrap.querySelectorAll('.row'), function(el){
+      el.addEventListener('click', function(){ openDetail(el.getAttribute('data-id')); });
+    });
+  }
+
+  function escapeHtml(s){
+    return (s||'').replace(/[&<>"']/g, function(m){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];
+    });
+  }
+
+  /* ---------- Add customer ---------- */
+  var addOverlay = document.getElementById('addOverlay');
+  document.getElementById('addBtn').addEventListener('click', function(){
+    ['f_name','f_phone','f_model','f_price','f_down','f_count'].forEach(function(id){
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('f_firstdue').value = todayISO();
+    document.getElementById('f_freq').value = 'monthly';
+    updatePreview();
+    addOverlay.classList.add('show');
+  });
+  document.getElementById('closeAdd').addEventListener('click', function(){ addOverlay.classList.remove('show'); });
+  addOverlay.addEventListener('click', function(e){ if(e.target === addOverlay) addOverlay.classList.remove('show'); });
+
+  function updatePreview(){
+    var price = parseFloat(document.getElementById('f_price').value) || 0;
+    var down = parseFloat(document.getElementById('f_down').value) || 0;
+    var count = parseInt(document.getElementById('f_count').value) || 0;
+    var funded = Math.max(price - down, 0);
+    var monthly = count > 0 ? funded / count : 0;
+    var freq = document.getElementById('f_freq').value;
+    document.getElementById('pv_funded').textContent = fmt(funded);
+    document.getElementById('pv_monthly').textContent = fmt(monthly);
+    document.getElementById('pv_freq_label').textContent = '/ ' + (freq === 'weekly' ? 'أسبوعيًا' : 'شهريًا');
+  }
+  ['f_price','f_down','f_count','f_freq'].forEach(function(id){
+    document.getElementById(id).addEventListener('input', updatePreview);
+    document.getElementById(id).addEventListener('change', updatePreview);
+  });
+
+  document.getElementById('saveBtn').addEventListener('click', async function(){
+    var name = document.getElementById('f_name').value.trim();
+    var phone = document.getElementById('f_phone').value.trim();
+    var model = document.getElementById('f_model').value.trim();
+    var price = parseFloat(document.getElementById('f_price').value) || 0;
+    var down = parseFloat(document.getElementById('f_down').value) || 0;
+    var count = parseInt(document.getElementById('f_count').value) || 0;
+    var firstDue = document.getElementById('f_firstdue').value || todayISO();
+    var freq = document.getElementById('f_freq').value;
+
+    if(!name){ toast('اكتب اسم العميل'); return; }
+    if(price <= 0 || count <= 0){ toast('اكتب السعر وعدد الأقساط'); return; }
+
+    var c = {
+      id: uid(), name: name, phone: phone, model: model,
+      price: price, down: down, count: count, firstDue: firstDue, freq: freq,
+      payments: [], createdAt: todayISO()
+    };
+    customers.push(c);
+    render();
+    addOverlay.classList.remove('show');
+    toast('تم حفظ العميل');
+    await persist();
+    maybeAutoSync();
+  });
+
+  /* ---------- Detail ---------- */
+  var detailOverlay = document.getElementById('detailOverlay');
+  document.getElementById('closeDetail').addEventListener('click', function(){ detailOverlay.classList.remove('show'); });
+  detailOverlay.addEventListener('click', function(e){ if(e.target === detailOverlay) detailOverlay.classList.remove('show'); });
+
+  function openDetail(id){
+    activeId = id;
+    renderDetail();
+    detailOverlay.classList.add('show');
+  }
+
+  function renderDetail(){
+    var c = customers.find(function(x){ return x.id === activeId; });
+    if(!c) return;
+    var d = derive(c);
+    document.getElementById('d_title').textContent = c.name;
+
+    var rows = '';
+    for(var i=0; i<c.count; i++){
+      var paid = c.payments[i];
+      var dueDate = addPeriod(c.firstDue, i, c.freq || 'monthly');
+      rows += '<div class="ledger-row">'+
+        '<span>'+(i+1)+'</span>'+
+        '<span class="date">'+(paid ? arDate(paid.date) : arDate(dueDate) + ' (متوقع)')+'</span>'+
+        '<span class="amt '+(paid?'paid':'pending')+'">'+(paid ? fmt(paid.amount) : '—')+'</span>'+
+      '</div>';
+    }
+
+    var body = document.getElementById('detailBody');
+    body.innerHTML =
+      '<div class="d-grid">'+
+        '<div class="d-item"><span>موديل الموبايل</span><b>'+escapeHtml(c.model||'—')+'</b></div>'+
+        '<div class="d-item"><span>رقم التليفون</span><b>'+escapeHtml(c.phone||'—')+'</b></div>'+
+        '<div class="d-item"><span>السعر الكاش</span><b>'+fmt(c.price)+' ج</b></div>'+
+        '<div class="d-item"><span>المقدم</span><b>'+fmt(c.down)+' ج</b></div>'+
+        '<div class="d-item"><span>المبلغ الممول</span><b>'+fmt(d.funded)+' ج</b></div>'+
+        '<div class="d-item"><span>قيمة القسط</span><b>'+fmt(d.monthly)+' ج</b></div>'+
+        '<div class="d-item"><span>دورية السداد</span><b>'+freqLabel(c.freq||'monthly')+'</b></div>'+
+        '<div class="d-item"><span>المحصل</span><b>'+fmt(d.collected)+' ج</b></div>'+
+        '<div class="d-item"><span>المتبقي</span><b>'+fmt(d.remaining)+' ج</b></div>'+
+        '<div class="d-item full"><span style="margin:0">الحالة — '+(d.completed ? 'مكتمل' : 'القسط القادم: '+arDate(d.nextDue))+'</span>'+
+          '<span class="status-pill '+d.status+'">'+statusLabel(d.status)+'</span></div>'+
+      '</div>'+
+      (c.phone ? '<button class="btn-primary" id="waBtn" style="background:var(--green); margin-bottom:10px;">تواصل عبر واتساب</button>' : '')+
+      (d.completed ? '' : '<button class="btn-primary" id="payBtn">تسجيل دفع قسط ('+fmt(d.monthly)+' ج)</button>')+
+      '<div class="section-label" style="margin-top:18px">سجل الأقساط</div>'+
+      '<div class="ledger">'+
+        '<div class="ledger-row head"><span>#</span><span class="date">التاريخ</span><span class="amt">المبلغ</span></div>'+
+        rows+
+      '</div>'+
+      '<button class="btn-danger" id="deleteBtn">حذف العميل</button>';
+
+    var waBtn = document.getElementById('waBtn');
+    if(waBtn){
+      waBtn.addEventListener('click', function(){
+        var msg;
+        var lastPayment = c.payments.length ? c.payments[c.payments.length - 1] : null;
+        if(lastPayment){
+          msg = 'أهلاً ' + c.name + '، نفيدك بإيصال استلام دفعة:' +
+                '\n- تاريخ السداد: ' + arDate(lastPayment.date) +
+                '\n- المبلغ المدفوع: ' + fmt(lastPayment.amount) + ' جنيه' +
+                '\n- الباقي عليك: ' + (d.completed ? '0 جنيه (تم السداد بالكامل)' : fmt(d.remaining) + ' جنيه') +
+                (d.completed ? '' : ('\n- القسط القادم: ' + arDate(d.nextDue))) +
+                '\nشكرًا لحضرتك.';
+        } else if(!d.completed){
+          msg = 'أهلاً ' + c.name + '، تذكير بقسط ' + (c.model||'الموبايل') + ' القادم بقيمة ' + fmt(d.monthly) + ' جنيه، المفروض يستحق بتاريخ ' + arDate(d.nextDue) + '.';
+        } else {
+          msg = 'أهلاً ' + c.name + '، بخصوص ' + (c.model||'الموبايل') + '، تم سداد كل الأقساط بالكامل، شكرًا لحضرتك.';
+        }
+        var link = waLink(c.phone, msg);
+        if(link) window.open(link, '_blank');
+      });
+    }
+
+    var payBtn = document.getElementById('payBtn');
+    if(payBtn){
+      payBtn.addEventListener('click', async function(){
+        var paidAmount = d.monthly;
+        c.payments.push({id: uid(), date: todayISO(), amount: paidAmount});
+        var dAfter = derive(c);
+        render();
+        renderDetail();
+        toast('تم تسجيل القسط');
+        await persist();
+        maybeAutoSync();
+
+        if(c.phone && confirm('تبعت إيصال الدفعة دي للعميل على واتساب دلوقتي؟')){
+          var msg = 'أهلاً ' + c.name + '، نفيدك بإيصال استلام دفعة:' +
+                '\n- تاريخ السداد: ' + arDate(todayISO()) +
+                '\n- المبلغ المدفوع: ' + fmt(paidAmount) + ' جنيه' +
+                '\n- الباقي عليك: ' + (dAfter.completed ? '0 جنيه (تم السداد بالكامل)' : fmt(dAfter.remaining) + ' جنيه') +
+                (dAfter.completed ? '' : ('\n- القسط القادم: ' + arDate(dAfter.nextDue))) +
+                '\nشكرًا لحضرتك.';
+          var link = waLink(c.phone, msg);
+          if(link) window.open(link, '_blank');
+        }
+      });
+    }
+    document.getElementById('deleteBtn').addEventListener('click', async function(){
+      if(!confirm('تأكيد حذف العميل "'+c.name+'"؟ الإجراء ده مش ممكن التراجع عنه.')) return;
+      customers = customers.filter(function(x){ return x.id !== c.id; });
+      detailOverlay.classList.remove('show');
+      render();
+      toast('تم حذف العميل');
+      await persist();
+    });
+  }
+
+  document.getElementById('searchInput').addEventListener('input', render);
+  document.getElementById('refreshBtn').addEventListener('click', load);
+
+  /* ================= EXPORT / IMPORT (transfer data between pages) ================= */
+  var xferOverlay = document.getElementById('xferOverlay');
+  document.getElementById('closeXfer').addEventListener('click', function(){ xferOverlay.classList.remove('show'); });
+  xferOverlay.addEventListener('click', function(e){ if(e.target===xferOverlay) xferOverlay.classList.remove('show'); });
+
+  document.getElementById('exportBtn').addEventListener('click', function(){
+    document.getElementById('xferTitle').textContent = 'نسخ احتياطي (تصدير)';
+    var raw = localStorage.getItem(STORAGE_KEY) || '[]';
+    document.getElementById('xferBody').innerHTML =
+      '<p style="font-size:13px; color:var(--ink-soft); margin:0 0 12px;">دوس "تحديد الكل ونسخ" وبعدين الصقه في خانة الاستيراد في الصفحة التانية.</p>'+
+      '<div class="field"><textarea id="xferText" rows="10" readonly></textarea></div>'+
+      '<button class="btn-primary" id="xferCopyBtn">تحديد الكل ونسخ</button>'+
+      '<div id="xferMsg" style="font-size:12.5px; color:var(--ink-soft); margin-top:10px; text-align:center;"></div>';
+    document.getElementById('xferText').value = raw;
+    document.getElementById('xferCopyBtn').addEventListener('click', async function(){
+      var ta = document.getElementById('xferText');
+      ta.focus(); ta.select();
+      try{
+        await navigator.clipboard.writeText(ta.value);
+        document.getElementById('xferMsg').textContent = 'تم النسخ، روح الصفحة التانية والصق في الاستيراد.';
+      }catch(e){
+        document.getElementById('xferMsg').textContent = 'النص متحدد دلوقتي — اضغط مطولًا عليه واختر "نسخ" من القائمة اللي هتظهر.';
+      }
+    });
+    xferOverlay.classList.add('show');
+  });
+
+  document.getElementById('importBtn').addEventListener('click', function(){
+    document.getElementById('xferTitle').textContent = 'استيراد نسخة احتياطية';
+    document.getElementById('xferBody').innerHTML =
+      '<p style="font-size:13px; color:var(--ink-soft); margin:0 0 12px;">الصق هنا النص اللي نسخته من زرار "نسخ احتياطي" في الصفحة التانية.</p>'+
+      '<div class="field"><textarea id="xferImportText" rows="10" placeholder="الصق النص هنا"></textarea></div>'+
+      '<div class="auth-err" id="xferErr" style="background:var(--red-bg); color:var(--red); font-size:13px; padding:9px 12px; border-radius:8px; margin-bottom:12px; display:none;"></div>'+
+      '<button class="btn-primary" id="xferImportBtn">استيراد ودمج مع بياناتي الحالية</button>';
+    document.getElementById('xferImportBtn').addEventListener('click', async function(){
+      var txt = document.getElementById('xferImportText').value.trim();
+      var errBox = document.getElementById('xferErr');
+      errBox.classList.remove('show'); errBox.style.display = 'none';
+      var incoming;
+      try{ incoming = JSON.parse(txt); if(!Array.isArray(incoming)) throw new Error('bad'); }
+      catch(e){
+        errBox.textContent = 'النص ده مش نسخة احتياطية صحيحة، تأكد إنك نسخته كامل من غير نقص.';
+        errBox.classList.add('show'); errBox.style.display = 'block';
+        return;
+      }
+      // merge by id, incoming wins on conflict, keep any local-only customers too
+      var byId = {};
+      customers.forEach(function(c){ byId[c.id] = c; });
+      incoming.forEach(function(c){ byId[c.id] = c; });
+      customers = Object.keys(byId).map(function(k){ return byId[k]; });
+      await persist();
+      render();
+      xferOverlay.classList.remove('show');
+      toast('تم استيراد '+incoming.length+' عميل بنجاح');
+    });
+    xferOverlay.classList.add('show');
+  });
+
+  /* ================= CLOUD SYNC (backup/push to Supabase) ================= */
+  var SUPABASE_URL = "https://zufqnxsldcitkglagwqz.supabase.co";
+  var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1ZnFueHNsZGNpdGtnbGFnd3F6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2MjE3NTYsImV4cCI6MjEwNzE5Nzc1Nn0.hVPpNiBLkDEDqhkxswLvgNeBnTced5tZoDcs0iJWS5c";
+  var EMAIL_DOMAIN = "@installments-atfeh.app";
+  var sbClient = null;
+
+  function normalizePhone(p){ return (p||'').trim().replace(/[^0-9]/g,''); }
+  function phoneToEmail(p){ return normalizePhone(p) + EMAIL_DOMAIN; }
+
+  function loadSupabaseLib(){
+    return new Promise(function(resolve, reject){
+      if(window.supabase){ resolve(); return; }
+      var s = document.createElement('script');
+      s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js";
+      s.onload = function(){ resolve(); };
+      s.onerror = function(){ reject(new Error('تعذر تحميل مكتبة المزامنة — تأكد من الاتصال بالإنترنت')); };
+      document.head.appendChild(s);
+    });
+  }
+
+  var syncOverlay = document.getElementById('syncOverlay');
+  document.getElementById('syncBtn').addEventListener('click', function(){
+    document.getElementById('syncErr').classList.remove('show'); document.getElementById('syncErr').style.display='none';
+    document.getElementById('syncStatus').textContent = '';
+    syncOverlay.classList.add('show');
+  });
+  document.getElementById('closeSync').addEventListener('click', function(){ syncOverlay.classList.remove('show'); });
+  syncOverlay.addEventListener('click', function(e){ if(e.target===syncOverlay) syncOverlay.classList.remove('show'); });
+
+  function syncErr(msg){
+    var e = document.getElementById('syncErr');
+    e.textContent = msg;
+    e.classList.add('show');
+    e.style.display = 'block';
+  }
+  function syncStatus(msg){
+    document.getElementById('syncStatus').textContent = msg;
+  }
+  function withTimeout(promise, ms, timeoutMsg){
+    return new Promise(function(resolve, reject){
+      var t = setTimeout(function(){ reject(new Error(timeoutMsg)); }, ms);
+      promise.then(function(v){ clearTimeout(t); resolve(v); },
+                   function(e){ clearTimeout(t); reject(e); });
+    });
+  }
+
+  /* Core bidirectional sync: pulls anything from the cloud not present locally,
+     then pushes anything local that isn't on the cloud yet. Works for both
+     manual login and silent session-reuse (auto-sync). */
+  async function performSync(opts){
+    opts = opts || {};
+    var onStatus = opts.onStatus || function(){};
+
+    onStatus('جاري تحميل مكتبة الاتصال…');
+    await withTimeout(loadSupabaseLib(), 12000, 'تعذر تحميل مكتبة الاتصال — الشبكة بطيئة جدًا أو محجوبة');
+    if(!sbClient) sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    var userId;
+    if(opts.email && opts.password){
+      onStatus('جاري تسجيل الدخول…');
+      var authRes = await withTimeout(
+        sbClient.auth.signInWithPassword({ email: opts.email, password: opts.password }),
+        15000, 'الاتصال بسيرفر الحساب معلّق — حاول تاني بعد شوية'
+      );
+      if(authRes.error) throw authRes.error;
+      userId = authRes.data.user.id;
+    } else {
+      var sess = await withTimeout(sbClient.auth.getSession(), 8000, 'تعذر التحقق من الجلسة');
+      if(!sess.data.session){ return {skipped:true}; }
+      userId = sess.data.session.user.id;
+    }
+
+    onStatus('جاري جلب بياناتك من السحابة…');
+    var rawNow = localStorage.getItem(STORAGE_KEY);
+    var freshCustomers = rawNow ? JSON.parse(rawNow) : [];
+
+    var pulled = await sbClient.from('customers').select('*, payments(*)');
+    if(pulled.error) throw new Error('تعذر جلب البيانات من السحابة: '+pulled.error.message);
+
+    var localByRemote = {};
+    freshCustomers.forEach(function(c){ if(c.remoteId) localByRemote[c.remoteId] = c; });
+
+    var pulledCustomers = 0, pulledPayments = 0;
+    (pulled.data || []).forEach(function(cr){
+      var local = localByRemote[cr.id];
+      if(!local){
+        local = {
+          id: uid(), remoteId: cr.id, name: cr.name, phone: cr.phone, model: cr.model,
+          price: parseFloat(cr.price), down: parseFloat(cr.down_payment),
+          count: cr.installments_count, freq: cr.freq, firstDue: cr.first_due_date,
+          payments: []
+        };
+        freshCustomers.push(local);
+        localByRemote[cr.id] = local;
+        pulledCustomers++;
+      }
+      var localPayRemoteIds = {};
+      local.payments.forEach(function(p){ if(p.remoteId) localPayRemoteIds[p.remoteId] = true; });
+      (cr.payments || []).forEach(function(cp){
+        if(!localPayRemoteIds[cp.id]){
+          local.payments.push({ id: uid(), remoteId: cp.id, date: cp.paid_date, amount: parseFloat(cp.amount) });
+          pulledPayments++;
+        }
+      });
+    });
+
+    onStatus('جاري رفع أي بيانات جديدة…');
+    var newCustomers = 0, newPayments = 0;
+    for(var i=0; i<freshCustomers.length; i++){
+      var c = freshCustomers[i];
+      if(!c.remoteId){
+        var ins = await sbClient.from('customers').insert({
+          user_id: userId, name: c.name, phone: c.phone, model: c.model,
+          price: c.price, down_payment: c.down, installments_count: c.count,
+          first_due_date: c.firstDue, freq: c.freq || 'monthly'
+        }).select().single();
+        if(ins.error){ throw new Error('تعذر رفع عميل "'+c.name+'": '+ins.error.message); }
+        c.remoteId = ins.data.id;
+        newCustomers++;
+      }
+      for(var j=0; j<c.payments.length; j++){
+        var p = c.payments[j];
+        if(!p.remoteId){
+          var pins = await sbClient.from('payments').insert({
+            customer_id: c.remoteId, amount: p.amount, paid_date: p.date
+          }).select().single();
+          if(pins.error){ throw new Error('تعذر رفع قسط لعميل "'+c.name+'": '+pins.error.message); }
+          p.remoteId = pins.data.id;
+          newPayments++;
+        }
+      }
+    }
+
+    customers = freshCustomers;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
+    render();
+
+    return { newCustomers: newCustomers, newPayments: newPayments,
+      pulledCustomers: pulledCustomers, pulledPayments: pulledPayments,
+      total: freshCustomers.length };
+  }
+
+  document.getElementById('syncRunBtn').addEventListener('click', async function(){
+    var btn = this;
+    var phone = normalizePhone(document.getElementById('sy_phone').value);
+    var pass = document.getElementById('sy_pass').value;
+    document.getElementById('syncErr').classList.remove('show'); document.getElementById('syncErr').style.display='none';
+
+    if(phone.length < 8){ syncErr('اكتب رقم موبايل حساب السحابة'); return; }
+    if(!pass){ syncErr('اكتب كلمة السر'); return; }
+
+    btn.disabled = true;
+    try{
+      var r = await performSync({ email: phoneToEmail(phone), password: pass, onStatus: syncStatus });
+      var parts = [];
+      if(r.pulledCustomers) parts.push('استرجعنا '+r.pulledCustomers+' عميل من السحابة');
+      if(r.newCustomers || r.newPayments) parts.push(r.newCustomers+' عميل و'+r.newPayments+' قسط اترفعوا');
+      if(!parts.length) parts.push('كل حاجة متزامنة بالفعل');
+      syncStatus('تم بنجاح: '+parts.join('، ')+' (إجمالي '+r.total+' عميل محفوظ).');
+      toast('تمت المزامنة بنجاح');
+      btn.disabled = false;
+      setTimeout(function(){ syncOverlay.classList.remove('show'); }, 2200);
+    }catch(e){
+      btn.disabled = false;
+      syncStatus('');
+      var msg = (e && e.message) || 'حصل خطأ غير متوقع';
+      if(msg.indexOf('Invalid login') !== -1) msg = 'رقم الموبايل أو كلمة السر غلط';
+      syncErr(msg);
+    }
+  });
+
+  /* Silent best-effort auto-sync after local changes — only runs if a
+     cloud session is already available (from a prior manual login), and
+     never interrupts the user or shows errors. */
+  async function maybeAutoSync(){
+    try{
+      if(!navigator.onLine) return;
+      await loadSupabaseLib();
+      if(!sbClient) sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      var r = await performSync({ onStatus: function(){} });
+      if(r && !r.skipped && (r.newCustomers || r.newPayments || r.pulledCustomers)){
+        toast('تمت المزامنة التلقائية مع السحابة');
+      }
+    }catch(e){ /* silent: background best-effort only */ }
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

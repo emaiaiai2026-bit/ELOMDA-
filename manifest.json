@@ -1,7 +1,7 @@
 {
   "name": "دفتر الأقساط",
   "short_name": "دفتر الأقساط",
-  "start_url": "./local.html",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",

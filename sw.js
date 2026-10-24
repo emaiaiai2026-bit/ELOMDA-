@@ -1,5 +1,5 @@
-var CACHE_NAME = 'installments-ledger-v2';
-var SHELL = ['./local.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-512-maskable.png'];
+var CACHE_NAME = 'installments-ledger-v3';
+var SHELL = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-512-maskable.png'];
 
 self.addEventListener('install', function(event){
   self.skipWaiting();
@@ -27,7 +27,7 @@ self.addEventListener('fetch', function(event){
         return resp;
       }).catch(function(){
         // offline and not cached: fall back to the app shell for navigations
-        if(event.request.mode === 'navigate'){ return caches.match('./local.html'); }
+        if(event.request.mode === 'navigate'){ return caches.match('./index.html'); }
       });
     })
   );
